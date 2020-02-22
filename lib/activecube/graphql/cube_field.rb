@@ -1,10 +1,17 @@
 require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
 
+require "graphql/schema/member"
+require "graphql/schema/field_extension"
+require "graphql/schema/field"
+require "graphql/schema/argument"
+require "graphql/execution/errors"
+
+
 module Activecube
   module Graphql
     class CubeField <  GraphQL::Schema::Field
-      argument_class Types::BaseArgument
+      argument_class GraphQL::Schema::Argument
 
       attr_reader :cube
       # Override #initialize to take a new argument cube:
