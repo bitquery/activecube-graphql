@@ -21,9 +21,11 @@ module Activecube
           if parent
             @definition = context_node.definitions.first.name
             if parent.dimension
-              @field = @definition
+              @dimension = parent.dimension
+              @field = (parent.field || dimension)[definition.to_sym]
+              raise ArgumentError, "#{definition} not implemented for #{key} in cube #{cube.name}" unless @field
             elsif parent.metric
-              raise ArgumentError, "Unexpected metric #{key}  for cube #{cube.name}"
+              raise ArgumentError, "Unexpected metric #{key} in cube #{cube.name}"
             else
               if !(@metric = cube.metrics[definition.to_sym]) && !(@dimension = cube.dimensions[definition.to_sym])
                 raise ArgumentError, "Metric or dimension #{definition} for #{key} not defined for cube #{cube.name}"
@@ -42,11 +44,9 @@ module Activecube
           if parent
 
             if metric
-              query = measure(metric, query)
-            end
-
-            if dimension
-              query = slice(dimension, query)
+              query = query.measure({key => apply_args(metric)})
+            elsif dimension && children.empty?
+              query = query.slice({key => apply_args(field || dimension)})
             end
 
           else
@@ -59,20 +59,6 @@ module Activecube
           end
 
           query
-        end
-
-        def measure metric, query
-          query.measure({key => apply_args(metric)})
-        end
-
-        def slice dimension, query
-          if children.empty?
-            query.slice({key => apply_args(dimension)})
-          else
-            query.slice Hash[children.collect do |field|
-              [field.key, field.apply_args(dimension[field.field.to_sym])]
-            end]
-          end
         end
 
         def apply_args element, args = self.arguments
