@@ -31,8 +31,8 @@ module Activecube
 
         database = obj.object.kind_of?(Hash) && obj.object[:database]
         response = database ? cube.connected_to(database: database) do
-          execute_query(tree)
-        end : execute_query(tree)
+          execute_query(tree, ctx)
+        end : execute_query(tree, ctx)
 
         ResponseBuilder.new tree, response
 
@@ -42,9 +42,9 @@ module Activecube
 
       private
 
-      def execute_query tree
+      def execute_query tree, ctx
         cube_query = tree.build_query
-        puts cube_query.to_sql
+        ctx[:sql_io].puts(cube_query.to_sql) if ctx[:sql_io].respond_to?(:puts)
         cube_query.query
       end
 
