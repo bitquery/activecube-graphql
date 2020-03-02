@@ -45,7 +45,7 @@ module Activecube
 
             if metric
               query = query.measure({key => apply_args(metric)})
-            elsif dimension && children.empty?
+            elsif dimension && (children.empty? || !arguments.empty?)
               query = query.slice({key => apply_args(field || dimension)})
             end
 
