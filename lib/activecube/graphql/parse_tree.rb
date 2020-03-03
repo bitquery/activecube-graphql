@@ -5,7 +5,7 @@ module Activecube
       class Element
 
         attr_reader :arguments, :ast_node, :cube, :parent, :name, :definition, :key,
-                    :children, :metric, :dimension, :field
+                    :children, :metric, :dimension, :field, :context_node
         def initialize cube, context_node, parent = nil
 
           @cube = cube
@@ -14,6 +14,7 @@ module Activecube
           @name = context_node.name
           @key = parent ? (parent.key ? "#{parent.key}.#{name}" : name ) : nil
 
+          @context_node = context_node
           @arguments =  context_node.arguments.to_h
 
           @ast_node = context_node.ast_node

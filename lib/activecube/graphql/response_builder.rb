@@ -9,6 +9,15 @@ module Activecube::Graphql
         @row = row
       end
 
+      def convert_type node_type, value
+        case node_type
+            when 'Boolean' then
+              value==1
+            else
+              value
+        end
+      end
+
     end
 
 
@@ -55,7 +64,7 @@ module Activecube::Graphql
 
       index = Hash[elements.collect { |element|
         value = if element.children.empty?
-                  @key_map[element.key]
+                  [@key_map[element.key], element.context_node.definition.type.name]
                 else
                   build_response_class element
                 end
@@ -67,8 +76,8 @@ module Activecube::Graphql
           key = ast_node.alias || ast_node.name
           if (value = index[key]).kind_of? Class
             value.new @row
-          elsif value.kind_of? Integer
-            @row[value]
+          elsif value.kind_of? Array
+            convert_type value.second, @row[value.first]
           else
             raise ArgumentError, "Unexpected request to #{definition} by key #{key}"
           end
@@ -88,13 +97,13 @@ module Activecube::Graphql
 
     def simple_value response_class, definition, element
       index = @key_map[element.key]
+      node_type = element.context_node.definition.type.name
       response_class.class_eval do
         define_method definition.underscore do |**rest_of_options|
-          @row[index]
+          convert_type node_type, @row[index]
         end
       end
     end
-
 
 
   end
