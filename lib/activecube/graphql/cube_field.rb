@@ -34,6 +34,10 @@ module Activecube
           execute_query(tree, ctx)
         end : execute_query(tree, ctx)
 
+        if ctx[:stat_io].respond_to?(:puts) && response.respond_to?(:statistics)
+          ctx[:stat_io].puts(response.statistics)
+        end
+
         ResponseBuilder.new tree, response
 
       rescue ArgumentError => ex
