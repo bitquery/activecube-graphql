@@ -108,10 +108,8 @@ module Activecube
             value.each { |v|
               element = apply_selector element, k, v
             }
-          elsif !value.detect { |e| !e.kind_of? String }
-            element = element.when(selector.in(value))
           else
-            raise ArgumentError, "Field #{k} has unexpected array value for #{element}"
+            element = element.when(selector.in(value))
           end
           element
         end
