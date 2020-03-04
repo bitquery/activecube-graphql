@@ -4,6 +4,8 @@ module Activecube
 
       class Element
 
+        TYPENAME = '__typename'
+
         attr_reader :arguments, :ast_node, :cube, :parent, :name, :definition, :key,
                     :children, :metric, :dimension, :field, :context_node
         def initialize cube, context_node, parent = nil
@@ -34,7 +36,9 @@ module Activecube
             end
           end
 
-          @children = context_node.typed_children.values.map(&:values).flatten.collect do |child|
+          @children = context_node.typed_children.values.map(&:values).flatten.
+              select{|child| child.name!=TYPENAME}.
+              collect do |child|
             Element.new cube, child, self
           end
 
