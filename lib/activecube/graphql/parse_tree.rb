@@ -36,14 +36,17 @@ module Activecube
             end
           end
 
-          @children = context_node.typed_children.values.map(&:values).flatten.
-              select{|child| child.name!=TYPENAME}.
+          @children = context_node.typed_children.values.map(&:values).flatten.uniq(&:name).
+              select{|child| child.name!=TYPENAME || union? }.
               collect do |child|
             Element.new cube, child, self
           end
 
         end
 
+        def union?
+          context_node.return_type.kind_of? GraphQL::UnionType
+        end
 
         def append_query query
           if parent
