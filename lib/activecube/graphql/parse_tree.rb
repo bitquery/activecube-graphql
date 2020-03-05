@@ -26,12 +26,12 @@ module Activecube
             if parent.dimension
               @dimension = parent.dimension
               @field = (parent.field || dimension)[definition.to_sym]
-              raise ArgumentError, "#{definition} not implemented for #{key} in cube #{cube.name}" unless @field
+              raise Activecube::InputArgumentError, "#{definition} not implemented for #{key} in cube #{cube.name}" unless @field
             elsif parent.metric
-              raise ArgumentError, "Unexpected metric #{key} in cube #{cube.name}"
+              raise Activecube::InputArgumentError, "Unexpected metric #{key} in cube #{cube.name}"
             else
               if !(@metric = cube.metrics[definition.to_sym]) && !(@dimension = cube.dimensions[definition.to_sym])
-                raise ArgumentError, "Metric or dimension #{definition} for #{key} not defined for cube #{cube.name}"
+                raise Activecube::InputArgumentError, "Metric or dimension #{definition} for #{key} not defined for cube #{cube.name}"
               end
             end
           end
@@ -84,7 +84,7 @@ module Activecube
             elsif element.respond_to? k
               element = element.send(k, *value)
             else
-              raise ArgumentError, "Field #{k} is not implemented for #{element}"
+              raise Activecube::InputArgumentError, "Field #{k} is not implemented for #{element}"
             end
 
           end
@@ -94,7 +94,7 @@ module Activecube
         def apply_selector element, k, hash
           hash.each_pair do |operator, arg|
             selector = cube.selectors[k]
-            raise ArgumentError, "#{selector} does not handle method '#{operator}' for #{element} '#{k}'" unless selector.respond_to?(operator)
+            raise Activecube::InputArgumentError, "#{selector} does not handle method '#{operator}' for #{element} '#{k}'" unless selector.respond_to?(operator)
             element = element.when( selector.send(operator, arg) ) unless arg.nil?
           end
           element

@@ -40,7 +40,7 @@ module Activecube
 
         ResponseBuilder.new tree, response
 
-      rescue ArgumentError => ex
+      rescue Activecube::InputArgumentError => ex
          raise GraphQL::ExecutionError, "Error executing #{cube.name}: #{ex.message}"
       end
 

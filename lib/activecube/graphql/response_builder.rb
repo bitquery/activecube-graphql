@@ -29,7 +29,7 @@ module Activecube::Graphql
     end
 
     def map &block
-      raise ArgumentError, "Block expected on map of root response" unless block_given?
+      raise Activecube::InputArgumentError, "Block expected on map of root response" unless block_given?
       response.rows.map do |row|
         block.call response_class.new row
       end
@@ -79,7 +79,7 @@ module Activecube::Graphql
           elsif value.kind_of? Array
             convert_type value.second, @row[value.first]
           else
-            raise ArgumentError, "Unexpected request to #{definition} by key #{key}"
+            raise Activecube::InputArgumentError, "Unexpected request to #{definition} by key #{key}"
           end
         end
       end
