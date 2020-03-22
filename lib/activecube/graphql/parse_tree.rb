@@ -30,7 +30,7 @@ module Activecube
             elsif parent.metric
               raise Activecube::InputArgumentError, "Unexpected metric #{key} in cube #{cube.name}"
             else
-              if !(@metric = cube.metrics[definition.to_sym]) && !(@dimension = cube.dimensions[definition.to_sym])
+              if !(@metric = (cube.metrics && cube.metrics[definition.to_sym])) && !(@dimension = (cube.dimensions && cube.dimensions[definition.to_sym]))
                 raise Activecube::InputArgumentError, "Metric or dimension #{definition} for #{key} not defined for cube #{cube.name}"
               end
             end
