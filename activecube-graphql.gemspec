@@ -24,8 +24,8 @@ to query cubes}
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_runtime_dependency 'activecube', '~> 0.1.6'
-  spec.add_runtime_dependency 'graphql', '~> 1.9'
+  spec.add_runtime_dependency 'activecube', '~> 0.1.14'
+  spec.add_runtime_dependency 'graphql', '~> 1.10'
 
   spec.add_development_dependency "bundler", "~> 1.17"
   spec.add_development_dependency "rake", ">= 13.0"
