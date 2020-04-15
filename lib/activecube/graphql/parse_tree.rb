@@ -5,6 +5,7 @@ module Activecube
       class Element
 
         TYPENAME = '__typename'
+        KEY_FIELD_PREFIX = '_aq.'
 
         attr_reader :arguments, :ast_node, :cube, :parent, :name, :definition, :key,
                     :children, :metric, :dimension, :field, :context_node
@@ -14,7 +15,7 @@ module Activecube
           @parent = parent
 
           @name = context_node.name
-          @key = parent ? (parent.key ? "#{parent.key}.#{name}" : name ) : nil
+          @key = parent ? (parent.key ? "#{parent.key}.#{name}" : KEY_FIELD_PREFIX+name ) : nil
 
           @context_node = context_node
           @arguments =  context_node.arguments.to_h
@@ -85,13 +86,21 @@ module Activecube
                 element = element.when( selector.eq(value) )
               end
             elsif element.respond_to? k
-              element = element.send(k, *value)
+              element = element.send(k, *converted_field_array(k, value))
             else
               raise Activecube::InputArgumentError, "Field #{k} is not implemented for #{element}"
             end
 
           end
           element
+        end
+
+        def converted_field_array method, values
+          if [:desc,:asc].include?(method)
+            values.collect{|v| KEY_FIELD_PREFIX + v}
+          else
+            values
+          end
         end
 
         def apply_selector element, k, hash

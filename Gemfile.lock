@@ -1,21 +1,21 @@
 PATH
   remote: .
   specs:
-    activecube-graphql (0.1.6)
+    activecube-graphql (0.1.8)
       activecube (~> 0.1.6)
       graphql (~> 1.9)
 
 GEM
   remote: https://rubygems.org/
   specs:
-    activecube (0.1.6)
+    activecube (0.1.14)
       activerecord (>= 5.2)
-    activemodel (6.0.2.1)
-      activesupport (= 6.0.2.1)
-    activerecord (6.0.2.1)
-      activemodel (= 6.0.2.1)
-      activesupport (= 6.0.2.1)
-    activesupport (6.0.2.1)
+    activemodel (6.0.2.2)
+      activesupport (= 6.0.2.2)
+    activerecord (6.0.2.2)
+      activemodel (= 6.0.2.2)
+      activesupport (= 6.0.2.2)
+    activesupport (6.0.2.2)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 0.7, < 2)
       minitest (~> 5.1)
@@ -23,7 +23,7 @@ GEM
       zeitwerk (~> 2.2)
     concurrent-ruby (1.1.6)
     diff-lcs (1.3)
-    graphql (1.10.4)
+    graphql (1.10.6)
     i18n (1.8.2)
       concurrent-ruby (~> 1.0)
     minitest (5.14.0)
@@ -42,7 +42,7 @@ GEM
       rspec-support (~> 3.9.0)
     rspec-support (3.9.2)
     thread_safe (0.3.6)
-    tzinfo (1.2.6)
+    tzinfo (1.2.7)
       thread_safe (~> 0.1)
     zeitwerk (2.3.0)
 
