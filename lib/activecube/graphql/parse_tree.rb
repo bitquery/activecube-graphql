@@ -74,10 +74,15 @@ module Activecube
           query
         end
 
+        private
+
         def apply_args element, args = self.arguments
           args && args.each_pair do |key, value|
             k = key.to_sym
-            if element.respond_to?(:selectors) && (selector =  cube.selectors[k])
+            has_selectors = element.respond_to?(:selectors)
+            if has_selectors && k==:any
+              element = apply_or_selector element, value
+            elsif has_selectors && (selector =  cube.selectors[k])
               if value.kind_of? Hash
                 element = apply_selector element, k, value
               elsif value.kind_of? Array
@@ -112,7 +117,28 @@ module Activecube
           element
         end
 
-        private
+        def apply_or_selector element, value
+          selectors = value.collect{|v| make_selector v }.compact
+          element.when( Activecube::Query::Selector.or(selectors) )
+        end
+
+        def make_selector hash
+          raise Activecube::InputArgumentError,  "Hash expected for selector, #{v} found instead" unless hash.kind_of?(Hash)
+          selectors = hash.to_a.collect{|attr, expressions|
+            k = attr.to_s.camelize(:lower).to_sym
+            expressions.collect{|expression|
+              expression.to_a.collect{|c|
+                operator, arg  = c
+                selector = cube.selectors[k]
+                raise Activecube::InputArgumentError, "Selector not found for '#{k}'" unless selector
+                raise Activecube::InputArgumentError, "#{selector} does not handle method '#{operator}' '#{k}'" unless selector.respond_to?(operator)
+                selector.send(operator, arg) unless arg.nil?
+                selector
+              }
+            }
+          }.flatten
+          Activecube::Query::Selector.and(selectors)
+        end
 
         def apply_to_array(element, k, selector, value)
 
