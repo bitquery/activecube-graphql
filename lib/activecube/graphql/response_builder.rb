@@ -97,7 +97,7 @@ module Activecube::Graphql
 
     def simple_value response_class, definition, element
       index = @key_map[element.key]
-      node_type = element.context_node.definition.type.name
+      node_type = element.context_node.definition.type.try(:of_type).try(:name)
       response_class.class_eval do
         define_method definition.underscore do |**rest_of_options|
           convert_type node_type, @row[index]
