@@ -126,7 +126,7 @@ module Activecube
           raise Activecube::InputArgumentError,  "Hash expected for selector, #{v} found instead" unless hash.kind_of?(Hash)
           selectors = hash.to_a.collect{|attr, expressions|
             k = attr.to_s.camelize(:lower).to_sym
-            expressions.collect{|expression|
+            (expressions.kind_of?(Array) ? expressions : [expressions]).collect{|expression|
               expression.to_a.collect{|c|
                 operator, arg  = c
                 selector = cube.selectors[k]
