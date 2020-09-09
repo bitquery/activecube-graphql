@@ -28,9 +28,7 @@ module Activecube
               @dimension = parent.dimension
               @field = (parent.field || dimension)[definition.to_sym]
               raise Activecube::InputArgumentError, "#{definition} not implemented for #{key} in cube #{cube.name}" unless @field
-            elsif parent.metric
-              raise Activecube::InputArgumentError, "Unexpected metric #{key} in cube #{cube.name}"
-            else
+            elsif !parent.metric
               if !(@metric = (cube.metrics && cube.metrics[definition.to_sym])) && !(@dimension = (cube.dimensions && cube.dimensions[definition.to_sym]))
                 raise Activecube::InputArgumentError, "Metric or dimension #{definition} for #{key} not defined for cube #{cube.name}"
               end

@@ -45,6 +45,8 @@ module Activecube::Graphql
           element = elements.first
           if element.children.empty?
             simple_value response_class, definition, element
+          elsif element.metric
+            array_value response_class, definition, element
           else
             sub_element response_class, definition, element
           end
@@ -95,10 +97,13 @@ module Activecube::Graphql
       end
     end
 
+    def node_type element
+      element.context_node.definition.type.try(:of_type).try(:name) || element.context_node.definition.type.try(:name)
+    end
+
     def simple_value response_class, definition, element
       index = @key_map[element.key]
-      node_type = element.context_node.definition.type.try(:of_type).try(:name) ||
-            element.context_node.definition.type.try(:name)
+      node_type = node_type element
       response_class.class_eval do
         define_method definition.underscore do |**rest_of_options|
           convert_type node_type, @row[index]
@@ -106,6 +111,39 @@ module Activecube::Graphql
       end
     end
 
+    def array_value response_class, definition, element
+      index = @key_map[element.key]
+      array_element_type = if element.children.empty?
+                             node_type element
+                           else
+                             tuple = element.metric.definition.class.tuple
+                             raise "Sizes of tuple #{element.children.size} not expected as in definition #{tuple}" unless tuple && tuple.size==element.children.size
+
+                             element.children.collect{|a|
+                               [a.name, node_type(a)]
+                             }.sort_by{|x| tuple.index x.first.to_sym }
+
+                           end
+
+      response_class.class_eval do
+        define_method definition.underscore do |**rest_of_options|
+          @row[index].map{|array_obj|
+            if array_obj.kind_of?(Array) && array_element_type.kind_of?(Array) && array_obj.size==array_element_type.size
+              Hash[array_obj.each_with_index.map{|obj, index|
+                    etype = array_element_type[index]
+                    [etype.first.underscore, convert_type(etype.second, obj)]
+                  }]
+            elsif !array_obj.kind_of?(Array) && array_element_type.kind_of?(String)
+              convert_type(array_element_type, obj)
+            else
+              raise "Mismatched data in #{array_obj} with #{array_element_type} for #{definition} of #{element.key}"
+            end
+          }
+        end
+      end
+
+
+    end
 
   end
 end
