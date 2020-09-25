@@ -117,21 +117,16 @@ module Activecube::Graphql
                              node_type element
                            else
                              tuple = element.metric.definition.class.tuple
-                             raise "Sizes of tuple #{element.children.size} not expected as in definition #{tuple}" unless tuple && tuple.size==element.children.size
-
-                             element.children.collect{|a|
-                               [a.name, node_type(a)]
-                             }.sort_by{|x| tuple.index x.first.to_sym }
-
+                             element.children.collect{|a| [ a.name, node_type(a), tuple.index(a.name.to_sym)]  }
                            end
 
       response_class.class_eval do
         define_method definition.underscore do |**rest_of_options|
           @row[index].map{|array_obj|
-            if array_obj.kind_of?(Array) && array_element_type.kind_of?(Array) && array_obj.size==array_element_type.size
-              Hash[array_obj.each_with_index.map{|obj, index|
-                    etype = array_element_type[index]
-                    [etype.first.underscore, convert_type(etype.second, obj)]
+            if array_obj.kind_of?(Array) && array_element_type.kind_of?(Array)
+              Hash[
+                  array_element_type.map{|etype|
+                    [etype.first.underscore, convert_type(etype.second, array_obj[etype.third])]
                   }]
             elsif !array_obj.kind_of?(Array) && array_element_type.kind_of?(String)
               convert_type(array_element_type, obj)
