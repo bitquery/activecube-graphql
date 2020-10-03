@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    activecube-graphql (0.1.14)
+    activecube-graphql (0.1.15)
       activecube (~> 0.1.28)
       graphql (~> 1.10)
 

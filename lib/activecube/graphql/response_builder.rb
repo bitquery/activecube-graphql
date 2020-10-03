@@ -18,6 +18,10 @@ module Activecube::Graphql
         end
       end
 
+      def __typename
+        raise Activecube::InputArgumentError, "Add __typename to the element for UNION or INTERFACE entity to resolve the type"
+      end
+
     end
 
 
