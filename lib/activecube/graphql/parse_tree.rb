@@ -98,12 +98,16 @@ module Activecube
           element
         end
 
+
         def converted_field_array method, values
-          if [:desc,:asc].include?(method)
-            values.collect{|v| KEY_FIELD_PREFIX + v}
-          else
-            values
-          end
+          case method
+            when :desc,:asc
+              values.collect{|v| KEY_FIELD_PREFIX + v}
+            when :limit_by
+              values.merge({each: KEY_FIELD_PREFIX + values[:each]})
+            else
+              values
+            end
         end
 
         def apply_selector element, k, hash

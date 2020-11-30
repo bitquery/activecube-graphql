@@ -1,14 +1,14 @@
 PATH
   remote: .
   specs:
-    activecube-graphql (0.1.15)
-      activecube (~> 0.1.28)
+    activecube-graphql (0.1.16)
+      activecube (~> 0.1.30)
       graphql (~> 1.10)
 
 GEM
   remote: https://rubygems.org/
   specs:
-    activecube (0.1.28)
+    activecube (0.1.30)
       activerecord (>= 5.2)
     activemodel (6.0.3.1)
       activesupport (= 6.0.3.1)
