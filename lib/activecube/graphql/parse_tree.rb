@@ -18,9 +18,10 @@ module Activecube
           @key = parent ? (parent.key ? "#{parent.key}.#{name}" : KEY_FIELD_PREFIX+name ) : nil
 
           @context_node = context_node
-          @arguments =  context_node.arguments.to_h
-
           @ast_node = context_node.ast_node
+
+          @arguments =  sort_node_arguments ast_node, context_node.arguments.to_h
+
 
           if parent
             @definition = context_node.definitions.first.name
@@ -41,6 +42,22 @@ module Activecube
             Element.new cube, child, self
           end
 
+        end
+
+        def sort_node_arguments ast_node, arguments
+          if (options = arguments['options']).kind_of?(Hash)
+            options_keys = context_node.ast_node.arguments.detect{|x| x.name=='options'}.value.arguments.map{|x|
+              x.name.underscore.to_sym
+            }
+            arguments['options'] = Hash[
+                options_keys.collect{|key|
+                  raise "Unmatched key #{key}" unless options[key]
+                  [key, options[key]]
+                }
+
+            ]
+          end
+          arguments
         end
 
         def union?
