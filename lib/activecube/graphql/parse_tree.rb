@@ -6,6 +6,7 @@ module Activecube
 
         TYPENAME = '__typename'
         KEY_FIELD_PREFIX = '_aq.'
+        NULLABLE_OPERATORS = [:eq,:not_eq,:is,:not]
 
         attr_reader :arguments, :ast_node, :cube, :parent, :name, :definition, :key,
                     :children, :metric, :dimension, :field, :context_node
@@ -131,9 +132,13 @@ module Activecube
           hash.each_pair do |operator, arg|
             selector = cube.selectors[k]
             raise Activecube::InputArgumentError, "#{selector} does not handle method '#{operator}' for #{element} '#{k}'" unless selector.respond_to?(operator)
-            element = element.when( selector.send(operator, arg) ) unless arg.nil?
+            element = element.when( selector.send(operator, arg) ) if applicable_operator?(operator, arg)
           end
           element
+        end
+
+        def applicable_operator? operator, arg
+          !arg.nil? || NULLABLE_OPERATORS.include?(operator)
         end
 
         def apply_or_selector element, value
