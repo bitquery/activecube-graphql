@@ -48,8 +48,9 @@ module Activecube
 
       def execute_query tree, ctx
         cube_query = tree.build_query
-        ctx[:sql_io].puts(cube_query.to_sql) if ctx[:sql_io].respond_to?(:puts)
         cube_query.user_agent = ctx[:sql_user_agent] || 'Ruby/Activecube Graphql'
+
+        ctx[:sql_io].puts(cube_query.to_sql) if ctx[:sql_io].respond_to?(:puts)
         cube_query.query
       end
 
