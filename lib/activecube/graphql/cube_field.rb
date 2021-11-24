@@ -29,7 +29,10 @@ module Activecube
         irep_node = ruby_kwargs[:irep_node]
         tree = ParseTree.new cube, irep_node
 
-        database = obj.object.kind_of?(Hash) && obj.object[:database]
+        object = obj.object
+        database = (object.kind_of?(Hash) && object[:database]) ||
+          (object.respond_to?(:database) && object.database)
+
         response = database ? cube.connected_to(database: database) do
           execute_query(tree, ctx)
         end : execute_query(tree, ctx)
