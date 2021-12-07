@@ -47,9 +47,16 @@ module Activecube
 
         def sort_node_arguments ast_node, arguments
           if (options = arguments['options']).kind_of?(Hash)
-            options_keys = context_node.ast_node.arguments.detect{|x| x.name=='options'}.value.arguments.map{|x|
-              x.name.underscore.to_sym
-            }
+            if opt_keys_args = context_node.ast_node.arguments.detect{|x| x.name=='options'}.value.try(:arguments)
+              options_keys = opt_keys_args.map{|x|
+                x.name.underscore.to_sym
+              }
+            elsif opt_keys_args_opt_name = context_node.ast_node.arguments.detect{|x| x.name=='options'}.value.try(:name)
+              options_keys = context_node.query.variables[opt_keys_args_opt_name].arguments.argument_values.map{|x, y|
+                x.underscore.to_sym
+              }
+            end
+
             arguments['options'] = Hash[
                 options_keys.collect{|key|
                   raise "Unmatched key #{key}" unless options[key]
