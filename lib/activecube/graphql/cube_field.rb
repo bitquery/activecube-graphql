@@ -37,10 +37,6 @@ module Activecube
           execute_query(tree, ctx, object)
         end : execute_query(tree, ctx, object)
 
-        if ctx[:stat_io].respond_to?(:puts) && response.respond_to?(:statistics)
-          ctx[:stat_io].puts(response.statistics)
-        end
-
         ResponseBuilder.new tree, response
 
       rescue Activecube::InputArgumentError => ex
@@ -52,9 +48,12 @@ module Activecube
       def execute_query tree, ctx, object
         cube_query = tree.build_query
         cube_query = object.append_cube_query(cube_query) if object.respond_to?(:append_cube_query)
-        cube_query.user_agent = ctx[:sql_user_agent] || 'Ruby/Activecube Graphql'
 
-        ctx[:sql_io].puts(cube_query.to_sql) if ctx[:sql_io].respond_to?(:puts)
+        stats = ctx[:stats]
+        cube_query.stats = stats
+
+        sql_io = stats.sql_io
+        sql_io.puts(cube_query.to_sql) if sql_io.respond_to?(:puts)
         cube_query.query
       end
 
