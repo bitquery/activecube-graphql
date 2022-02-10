@@ -48,12 +48,7 @@ module Activecube
       def execute_query tree, ctx, object
         cube_query = tree.build_query
         cube_query = object.append_cube_query(cube_query) if object.respond_to?(:append_cube_query)
-
-        stats = ctx[:stats]
-        cube_query.stats = stats
-
-        sql_io = stats.sql_io
-        sql_io.puts(cube_query.to_sql) if sql_io.respond_to?(:puts)
+        cube_query.stats = ctx[:stats]
         cube_query.query
       end
 
