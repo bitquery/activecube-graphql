@@ -8,21 +8,19 @@ module Activecube
         KEY_FIELD_PREFIX = '_aq.'
         NULLABLE_OPERATORS = [:eq,:not_eq,:is,:not]
 
-        attr_reader :arguments, :ast_node, :cube, :parent, :name, :definition, :key,
-                    :children, :metric, :dimension, :field, :context_node
+        attr_reader :arguments, :cube, :parent, :name, :definition, :key,
+                    :children, :metric, :dimension, :field, :type_name
+
         def initialize cube, context_node, parent = nil
 
           @cube = cube
           @parent = parent
+          @type_name = context_node.definition.type.try(:of_type).try(:name) || context_node.definition.type.try(:name)
 
           @name = context_node.name
           @key = parent ? (parent.key ? "#{parent.key}.#{name}" : KEY_FIELD_PREFIX+name ) : nil
 
-          @context_node = context_node
-          @ast_node = context_node.ast_node
-
-          @arguments =  sort_node_arguments ast_node, context_node.arguments.to_h
-
+          @arguments =  sort_node_arguments context_node
 
           if parent
             @definition = context_node.definitions.first.name
@@ -38,14 +36,15 @@ module Activecube
           end
 
           @children = context_node.typed_children.values.map(&:values).flatten.uniq(&:name).
-              select{|child| child.name!=TYPENAME || union? }.
+              select{|child| child.name!=TYPENAME || union?(context_node) }.
               collect do |child|
             Element.new cube, child, self
           end
 
         end
 
-        def sort_node_arguments ast_node, arguments
+        def sort_node_arguments context_node
+          arguments = context_node.arguments.to_h
           if (options = arguments['options']).kind_of?(Hash)
             if opt_keys_args = context_node.ast_node.arguments.detect{|x| x.name=='options'}.value.try(:arguments)
               options_keys = opt_keys_args.map{|x|
@@ -68,8 +67,18 @@ module Activecube
           arguments
         end
 
-        def union?
+        def union? context_node
           context_node.return_type.kind_of? GraphQL::UnionType
+        end
+
+        def as_json options = {}
+          {
+            cube: cube.name,
+            name: name,
+            definition: definition,
+            key: key,
+            children: children
+          }
         end
 
         def append_query query
