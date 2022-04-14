@@ -135,7 +135,7 @@ module Activecube
 
         def converted_field_array method, values
           case method
-            when :desc,:asc
+            when :desc, :desc_by_integer, :asc, :asc_by_integer
               values.collect{|v| KEY_FIELD_PREFIX + v}
             when :limit_by
               values.merge({each: KEY_FIELD_PREFIX + values[:each]})
