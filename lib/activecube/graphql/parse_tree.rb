@@ -58,7 +58,7 @@ module Activecube
 
             arguments['options'] = Hash[
                 options_keys.collect{|key|
-                  raise "Unmatched key #{key}" unless options[key]
+                  raise "Unmatched key #{key}" if options[key].nil?
                   [key, options[key]]
                 }
 
