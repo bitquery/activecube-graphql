@@ -110,6 +110,8 @@ module Activecube
 
         def apply_args element, args = self.arguments
           args && args.each_pair do |key, value|
+            # raise error if value contains prefix
+            raise Activecube::InputArgumentError, "It's not allowed to use '#{KEY_FIELD_PREFIX}' prefix in arguments" if value.to_s.include?(KEY_FIELD_PREFIX)
             k = key.to_sym
             has_selectors = element.respond_to?(:selectors)
             if has_selectors && k==:any
