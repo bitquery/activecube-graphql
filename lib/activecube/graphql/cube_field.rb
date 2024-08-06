@@ -49,6 +49,7 @@ module Activecube
         cube_query = tree.build_query
         cube_query = object.append_cube_query(cube_query) if object.respond_to?(:append_cube_query)
         cube_query.stats = ctx[:stats]
+        cube_query.headers = ctx[:headers]
         cube_query.query
       end
 
