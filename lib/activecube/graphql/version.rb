@@ -1,5 +1,6 @@
 module Activecube
   module Graphql
-    VERSION = "0.1.29"
+    VERSION = "0.1.30"
   end
+
 end
