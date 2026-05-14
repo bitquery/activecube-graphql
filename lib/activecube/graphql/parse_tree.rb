@@ -150,13 +150,15 @@ module Activecube
           hash.each_pair do |operator, arg|
             selector = cube.selectors[k]
             raise Activecube::InputArgumentError, "#{selector} does not handle method '#{operator}' for #{element} '#{k}'" unless selector.respond_to?(operator)
-            element = element.when( selector.send(operator, arg) ) if applicable_operator?(operator, arg)
+            if arg.nil? && !NULLABLE_OPERATORS.include?(operator)
+              raise Activecube::InputArgumentError,
+                    "Selector '#{k}' operator '#{operator}' requires a non-null value (got null). " \
+                    "Common cause: a query variable was not supplied, or the JSON " \
+                    "variable key does not match the variable name declared in the query."
+            end
+            element = element.when( selector.send(operator, arg) )
           end
           element
-        end
-
-        def applicable_operator? operator, arg
-          !arg.nil? || NULLABLE_OPERATORS.include?(operator)
         end
 
         def apply_or_selector element, value
