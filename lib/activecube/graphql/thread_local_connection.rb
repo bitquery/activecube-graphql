@@ -2,23 +2,35 @@ require "active_record"
 
 module Activecube
   module Graphql
-    # Соединение ClickHouse на время резолва одного поля.
+    # Соединение ClickHouse на время резолва одного поля в фоновом потоке.
     #
-    # Rails 6.0 connected_to(database:) переустанавливает пул модели в общем
+    # Rails 6.0 connected_to(database:) переустанавливает пул "primary" в общем
     # для процесса ConnectionHandler (remove_connection → disconnect! → новый
-    # пул), и параллельные поля бьют друг друга. Подменять ConnectionHandler
-    # целиком тоже нельзя: в том же потоке модели других баз (справочник
-    # Blockchain на ReferenceRecord) перестают находить свои пулы.
+    # пул). Это не потокобезопасно, но на этом же держится остальное
+    # приложение: вложенные резолверы (balances, smartContract и т.п.) идут в
+    # ту базу, куда процесс «подключён» последним connected_to, а кубы
+    # переопределяют connected_to (ConnectToFlowDatabase → ApplicationRecord
+    # .connected_to(database: "<db>_flow")). Поэтому:
     #
-    # Поэтому глобальное состояние не трогается вовсе: для поля создаётся
-    # собственный ConnectionPool по конфигу базы и кладётся в thread-local.
-    # connection/connection_pool на ActiveRecord::Base отдают его тем классам,
-    # чьё connection_specification_name совпадает с именем пула (ровно те,
-    # кому прежде пул переустанавливал connected_to; приложение зовёт и
-    # ActiveRecord::Base.connection напрямую). Остальные — как раньше. Пул
-    # отключается по окончании поля.
+    # - в потоке поля (Thread.current[FIELD_THREAD]) connected_to(database:)
+    #   на любом классе ActiveRecord не трогает глобальный пул, а создаёт
+    #   собственный ConnectionPool в thread-local; connection/connection_pool
+    #   отдают его классам с совпадающим connection_specification_name (ровно
+    #   тем, кому прежде пул переустанавливал connected_to); остальные
+    #   (ReferenceRecord/Blockchain) — как раньше;
+    # - вне потока поля connected_to работает как в Rails — см.
+    #   CubeField: при форсировании значения в основном потоке он вызывается
+    #   ещё раз, чтобы вложенные резолверы видели нужную базу.
     module ThreadLocalConnection
       KEY = :activecube_graphql_pool
+      FIELD_THREAD = :activecube_graphql_field_thread
+
+      def connected_to(database: nil, role: nil, prevent_writes: false, &blk)
+        return super unless database && Thread.current[FIELD_THREAD]
+
+        database = database.first.last if database.is_a?(Hash)
+        Activecube::Graphql::ThreadLocalConnection.with(self, database, &blk)
+      end
 
       def connection
         pool = Activecube::Graphql::ThreadLocalConnection.pool_for(self)
@@ -41,7 +53,6 @@ module Activecube
       end
 
       def self.with(model, database)
-        install
         config = model.send(:resolve_config_for_connection, database)
         resolver = ActiveRecord::ConnectionAdapters::ConnectionSpecification::Resolver.new(ActiveRecord::Base.configurations)
         pool = ActiveRecord::ConnectionAdapters::ConnectionPool.new(resolver.spec(config))

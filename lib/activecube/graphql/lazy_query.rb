@@ -1,4 +1,5 @@
 require 'concurrent'
+require "activecube/graphql/thread_local_connection"
 
 module Activecube
   module Graphql
@@ -40,8 +41,12 @@ module Activecube
         @semaphore ||= Concurrent::Semaphore.new([max_parallel, 1].max)
       end
 
-      def initialize(&block)
+      # on_force — вызывается в форсирующем потоке после завершения фонового
+      # блока (см. CubeField: повторное connected_to ради вложенных резолверов).
+      # При синхронном вычислении не вызывается: блок сам отработал в этом потоке.
+      def initialize(on_force: nil, &block)
         @block = block
+        @on_force = on_force
         @thread = start_thread
       end
 
@@ -50,7 +55,12 @@ module Activecube
       def value
         return @value if defined?(@value)
 
-        outcome = @thread ? @thread.value : run_block
+        if @thread
+          outcome = @thread.value
+          @on_force.call if @on_force
+        else
+          outcome = run_block
+        end
         @value = unwrap(outcome)
       end
 
@@ -66,6 +76,7 @@ module Activecube
         Thread.new do
           begin
             Thread.current.report_on_exception = false
+            Thread.current[ThreadLocalConnection::FIELD_THREAD] = true
             with_rails_executor { run_block }
           ensure
             self.class.semaphore.release

@@ -23,6 +23,7 @@ module Activecube
       def initialize(*args, cube: nil, **kwargs, &block)
         @cube = cube
         ThreadLocalDatabase.install(cube) if cube
+        ThreadLocalConnection.install
         # Pass on the default args:
         super(*args, **kwargs, &block)
         append_extra :irep_node
@@ -49,10 +50,21 @@ module Activecube
         # graphql-ruby форсирует результат только после резолва всех соседних
         # полей. Благодаря этому алиасы одного корневого поля идут в базу
         # одновременно. Требует lazy_resolve(LazyQuery, :value) на схеме.
-        LazyQuery.new do
+        # Отложенное значение: запрос стартует в потоке при резолве поля, а
+        # graphql-ruby форсирует результат после обхода соседних полей, так
+        # что алиасы одного уровня идут в базу одновременно. Требует
+        # lazy_resolve(LazyQuery, :value) на схеме.
+        #
+        # В потоке connected_to уходит в thread-local пул (ThreadLocalConnection);
+        # при форсировании в основном потоке он вызывается ещё раз без запроса,
+        # чтобы процесс был «подключён» к базе поля для вложенных резолверов —
+        # так же, как при прежнем последовательном резолве.
+        reconnect = database ? -> { cube.connected_to(database: database) {} } : nil
+
+        LazyQuery.new(on_force: reconnect) do
           begin
             ThreadLocalDatabase.with(database) do
-              response = database ? with_isolated_connection(database) do
+              response = database ? cube.connected_to(database: database) do
                 execute_query(tree, ctx, object)
               end : execute_query(tree, ctx, object)
 
@@ -65,13 +77,6 @@ module Activecube
       end
 
       private
-
-      # Соединение ClickHouse — своё на поле, без правки глобального состояния
-      # (см. ThreadLocalConnection). cube.connected_to не используется: его
-      # establish_connection в общем ConnectionHandler не потокобезопасен.
-      def with_isolated_connection(database, &block)
-        ThreadLocalConnection.with(cube.send(:super_model), database, &block)
-      end
 
       def execute_query tree, ctx, object
         cube_query = tree.build_query
