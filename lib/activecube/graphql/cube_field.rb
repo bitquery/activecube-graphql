@@ -3,7 +3,7 @@ require "activecube/graphql/response_builder"
 require "activecube/graphql/lazy_query"
 require "activecube/graphql/field_stats"
 require "activecube/graphql/thread_local_database"
-require "active_record"
+require "activecube/graphql/thread_local_connection"
 require "securerandom"
 
 require "graphql/schema/member"
@@ -66,23 +66,11 @@ module Activecube
 
       private
 
-      # Rails 6.0: cube.connected_to(database:) переустанавливает пул "primary"
-      # в ConnectionHandler, общем для всех потоков процесса
-      # (remove_connection → disconnect! → новый пул). Два параллельных поля
-      # на одной базе бьют друг друга: пока один поток находится между
-      # удалением старого пула и вставкой нового, второй в
-      # retrieve_connection_pool проваливается в пул процесса-прародителя
-      # (мастер Puma) с конфигом без database и падает с
-      # "No database specified". Поэтому каждому полю — собственный
-      # ConnectionHandler, подменённый в thread-local только на время запроса;
-      # общий handler процесса при этом не трогается вовсе.
-      def with_isolated_connection(database)
-        model = cube.send(:super_model)
-        handler = ActiveRecord::ConnectionAdapters::ConnectionHandler.new
-        handler.establish_connection(model.send(:resolve_config_for_connection, database))
-        model.send(:swap_connection_handler, handler) { yield }
-      ensure
-        handler.clear_all_connections! if handler
+      # Соединение ClickHouse — своё на поле, без правки глобального состояния
+      # (см. ThreadLocalConnection). cube.connected_to не используется: его
+      # establish_connection в общем ConnectionHandler не потокобезопасен.
+      def with_isolated_connection(database, &block)
+        ThreadLocalConnection.with(cube.send(:super_model), database, &block)
       end
 
       def execute_query tree, ctx, object
