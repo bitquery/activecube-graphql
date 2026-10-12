@@ -1,3 +1,4 @@
+require "activecube/view"
 require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
 require "activecube/graphql/lazy_query"
@@ -61,7 +62,7 @@ module Activecube
         # так же, как при прежнем последовательном резолве.
         reconnect = database ? -> { cube.connected_to(database: database) {} } : nil
 
-        LazyQuery.new(on_force: reconnect) do
+        LazyQuery.new(on_force: reconnect, parallel: parallel_safe?) do
           begin
             ThreadLocalDatabase.with(database) do
               response = database ? cube.connected_to(database: database) do
@@ -77,6 +78,20 @@ module Activecube
       end
 
       private
+
+      # Кубы на Activecube::View выполняют свой Ruby-код и держат состояние на
+      # классе (coinpath: self.class.connect_to connection, временные таблицы
+      # в сессии ClickHouse). Два таких поля в параллельных потоках
+      # перезаписывают друг другу соединение, и финальный запрос уходит в
+      # чужую сессию ("Table coinpath.txs_... doesn't exist"). Поэтому
+      # view-кубы резолвятся как прежде — синхронно при форсировании;
+      # параллельно идут только табличные кубы.
+      def parallel_safe?
+        return @parallel_safe if defined?(@parallel_safe)
+
+        models = cube.respond_to?(:models) ? Array(cube.models) : []
+        @parallel_safe = models.none? { |m| m.is_a?(Class) && m < Activecube::View }
+      end
 
       def execute_query tree, ctx, object
         cube_query = tree.build_query

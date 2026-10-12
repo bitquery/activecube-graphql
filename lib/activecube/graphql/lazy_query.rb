@@ -44,10 +44,12 @@ module Activecube
       # on_force — вызывается в форсирующем потоке после завершения фонового
       # блока (см. CubeField: повторное connected_to ради вложенных резолверов).
       # При синхронном вычислении не вызывается: блок сам отработал в этом потоке.
-      def initialize(on_force: nil, &block)
+      # parallel: false — блок будет вычислен синхронно при форсировании
+      # (прежнее поведение); см. CubeField#parallel_safe?.
+      def initialize(on_force: nil, parallel: true, &block)
         @block = block
         @on_force = on_force
-        @thread = start_thread
+        @thread = parallel ? start_thread : nil
       end
 
       # Форсирование значения. Исключения, пойманные в потоке, поднимаются здесь,

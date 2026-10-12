@@ -68,4 +68,19 @@ RSpec.describe Activecube::Graphql::LazyQuery do
     3.times { lazy.value }
     expect(calls).to eq 1
   end
+
+  it "evaluates synchronously at force time when parallel: false" do
+    ran_in = nil
+    lazy = described_class.new(parallel: false) { ran_in = Thread.current; :v }
+    expect(ran_in).to be_nil
+    expect(lazy.value).to eq(:v)
+    expect(ran_in).to eq(Thread.current)
+  end
+
+  it "runs on_force only after a threaded evaluation" do
+    forced = []
+    described_class.new(on_force: -> { forced << :threaded }) { :a }.value
+    described_class.new(on_force: -> { forced << :sync }, parallel: false) { :b }.value
+    expect(forced).to eq([:threaded])
+  end
 end
