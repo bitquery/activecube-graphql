@@ -1,4 +1,4 @@
-require "activecube/view"
+require "activecube/query_methods"
 require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
 require "activecube/graphql/lazy_query"
@@ -79,18 +79,20 @@ module Activecube
 
       private
 
-      # Кубы на Activecube::View выполняют свой Ruby-код и держат состояние на
-      # классе (coinpath: self.class.connect_to connection, временные таблицы
-      # в сессии ClickHouse). Два таких поля в параллельных потоках
-      # перезаписывают друг другу соединение, и финальный запрос уходит в
-      # чужую сессию ("Table coinpath.txs_... doesn't exist"). Поэтому
-      # view-кубы резолвятся как прежде — синхронно при форсировании;
-      # параллельно идут только табличные кубы.
+      # Кубы, переопределяющие connected_to (в приложении — Common::
+      # ConnectToFlowDatabase: coinpath и address_stat на flow-базе), держат
+      # состояние на классе: их view делает self.class.connect_to connection,
+      # а временные таблицы живут в сессии ClickHouse. Два таких поля в
+      # параллельных потоках перезаписывают друг другу соединение, и финальный
+      # запрос уходит в чужую сессию ("Table coinpath.txs_... doesn't exist").
+      # Такие кубы резолвятся как прежде — синхронно при форсировании.
+      # Обычные кубы на таблицах и чистых SQL-view (в т.ч. solana transfers с
+      # View::TransfersAnyFromTo) идут параллельно.
       def parallel_safe?
         return @parallel_safe if defined?(@parallel_safe)
 
-        models = cube.respond_to?(:models) ? Array(cube.models) : []
-        @parallel_safe = models.none? { |m| m.is_a?(Class) && m < Activecube::View }
+        owner = cube.respond_to?(:connected_to) ? cube.method(:connected_to).owner : nil
+        @parallel_safe = owner.nil? || owner == Activecube::QueryMethods
       end
 
       def execute_query tree, ctx, object
