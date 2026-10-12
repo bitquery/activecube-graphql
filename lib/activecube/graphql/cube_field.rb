@@ -32,6 +32,10 @@ module Activecube
 
         irep_node = ruby_kwargs[:irep_node]
         tree = ParseTree.new cube, irep_node
+        # Сигнатура execute_query(tree, ctx, object) — публичный контракт:
+        # приложение её переопределяет (prepend) и зовёт super, поэтому
+        # статистика поля передаётся через tree, а не аргументом.
+        tree.stats = field_stats ctx, irep_node
 
         object = obj.object
         database = (object.kind_of?(Hash) && object[:database]) ||
@@ -46,8 +50,8 @@ module Activecube
         LazyQuery.new do
           begin
             response = database ? with_isolated_connection(database) do
-              execute_query(tree, ctx, object, irep_node)
-            end : execute_query(tree, ctx, object, irep_node)
+              execute_query(tree, ctx, object)
+            end : execute_query(tree, ctx, object)
 
             ResponseBuilder.new tree, response
           rescue Activecube::InputArgumentError => ex
@@ -77,10 +81,10 @@ module Activecube
         handler.clear_all_connections! if handler
       end
 
-      def execute_query tree, ctx, object, irep_node
+      def execute_query tree, ctx, object
         cube_query = tree.build_query
         cube_query = object.append_cube_query(cube_query) if object.respond_to?(:append_cube_query)
-        cube_query.stats = field_stats(ctx, irep_node)
+        cube_query.stats = tree.stats || ctx[:stats]
         cube_query.headers = ctx[:headers]
         cube_query.query
       end
