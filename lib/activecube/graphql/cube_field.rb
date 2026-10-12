@@ -1,6 +1,7 @@
 require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
 require "activecube/graphql/lazy_query"
+require "active_record"
 
 require "graphql/schema/member"
 require "graphql/schema/field_extension"
@@ -42,9 +43,7 @@ module Activecube
         # одновременно. Требует lazy_resolve(LazyQuery, :value) на схеме.
         LazyQuery.new do
           begin
-            # connected_to хранит роль в thread-local, поэтому вызывается
-            # внутри потока, а не снаружи.
-            response = database ? cube.connected_to(database: database) do
+            response = database ? with_isolated_connection(database) do
               execute_query(tree, ctx, object)
             end : execute_query(tree, ctx, object)
 
@@ -56,6 +55,25 @@ module Activecube
       end
 
       private
+
+      # Rails 6.0: cube.connected_to(database:) переустанавливает пул "primary"
+      # в ConnectionHandler, общем для всех потоков процесса
+      # (remove_connection → disconnect! → новый пул). Два параллельных поля
+      # на одной базе бьют друг друга: пока один поток находится между
+      # удалением старого пула и вставкой нового, второй в
+      # retrieve_connection_pool проваливается в пул процесса-прародителя
+      # (мастер Puma) с конфигом без database и падает с
+      # "No database specified". Поэтому каждому полю — собственный
+      # ConnectionHandler, подменённый в thread-local только на время запроса;
+      # общий handler процесса при этом не трогается вовсе.
+      def with_isolated_connection(database)
+        model = cube.send(:super_model)
+        handler = ActiveRecord::ConnectionAdapters::ConnectionHandler.new
+        handler.establish_connection(model.send(:resolve_config_for_connection, database))
+        model.send(:swap_connection_handler, handler) { yield }
+      ensure
+        handler.clear_all_connections! if handler
+      end
 
       def execute_query tree, ctx, object
         cube_query = tree.build_query
