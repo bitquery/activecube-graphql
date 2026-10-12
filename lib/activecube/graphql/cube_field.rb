@@ -1,7 +1,9 @@
 require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
 require "activecube/graphql/lazy_query"
+require "activecube/graphql/field_stats"
 require "active_record"
+require "securerandom"
 
 require "graphql/schema/member"
 require "graphql/schema/field_extension"
@@ -78,9 +80,19 @@ module Activecube
       def execute_query tree, ctx, object
         cube_query = tree.build_query
         cube_query = object.append_cube_query(cube_query) if object.respond_to?(:append_cube_query)
-        cube_query.stats = ctx[:stats]
+        cube_query.stats = field_stats(ctx)
         cube_query.headers = ctx[:headers]
         cube_query.query
+      end
+
+      # Своя сессия ClickHouse на каждое поле (см. FieldStats). Суффикс —
+      # путь поля в ответе: уникален в пределах запроса и виден в query_log.
+      def field_stats ctx
+        stats = ctx[:stats]
+        return stats unless stats.respond_to?(:session_id)
+
+        suffix = ctx.respond_to?(:path) && ctx.path ? ctx.path.join('.') : SecureRandom.hex(4)
+        FieldStats.new(stats, suffix)
       end
 
       def append_extra extra
