@@ -2,6 +2,7 @@ require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
 require "activecube/graphql/lazy_query"
 require "activecube/graphql/field_stats"
+require "activecube/graphql/thread_local_database"
 require "active_record"
 require "securerandom"
 
@@ -21,6 +22,7 @@ module Activecube
       # Override #initialize to take a new argument cube:
       def initialize(*args, cube: nil, **kwargs, &block)
         @cube = cube
+        ThreadLocalDatabase.install(cube) if cube
         # Pass on the default args:
         super(*args, **kwargs, &block)
         append_extra :irep_node
@@ -49,11 +51,13 @@ module Activecube
         # одновременно. Требует lazy_resolve(LazyQuery, :value) на схеме.
         LazyQuery.new do
           begin
-            response = database ? with_isolated_connection(database) do
-              execute_query(tree, ctx, object)
-            end : execute_query(tree, ctx, object)
+            ThreadLocalDatabase.with(database) do
+              response = database ? with_isolated_connection(database) do
+                execute_query(tree, ctx, object)
+              end : execute_query(tree, ctx, object)
 
-            ResponseBuilder.new tree, response
+              ResponseBuilder.new tree, response
+            end
           rescue Activecube::InputArgumentError => ex
             raise GraphQL::ExecutionError, "Error executing #{cube_name}: #{ex.message}"
           end
