@@ -1,5 +1,6 @@
 require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
+require "activecube/graphql/lazy_query"
 
 require "graphql/schema/member"
 require "graphql/schema/field_extension"
@@ -33,14 +34,25 @@ module Activecube
         database = (object.kind_of?(Hash) && object[:database]) ||
           (object.respond_to?(:database) && object.database)
 
-        response = database ? cube.connected_to(database: database) do
-          execute_query(tree, ctx, object)
-        end : execute_query(tree, ctx, object)
+        cube_name = cube.name
 
-        ResponseBuilder.new tree, response
+        # Возвращаем отложенное значение: запрос к базе стартует сразу, а
+        # graphql-ruby форсирует результат только после резолва всех соседних
+        # полей. Благодаря этому алиасы одного корневого поля идут в базу
+        # одновременно. Требует lazy_resolve(LazyQuery, :value) на схеме.
+        LazyQuery.new do
+          begin
+            # connected_to хранит роль в thread-local, поэтому вызывается
+            # внутри потока, а не снаружи.
+            response = database ? cube.connected_to(database: database) do
+              execute_query(tree, ctx, object)
+            end : execute_query(tree, ctx, object)
 
-      rescue Activecube::InputArgumentError => ex
-         raise GraphQL::ExecutionError, "Error executing #{cube.name}: #{ex.message}"
+            ResponseBuilder.new tree, response
+          rescue Activecube::InputArgumentError => ex
+            raise GraphQL::ExecutionError, "Error executing #{cube_name}: #{ex.message}"
+          end
+        end
       end
 
       private
