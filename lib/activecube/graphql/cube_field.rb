@@ -46,8 +46,8 @@ module Activecube
         LazyQuery.new do
           begin
             response = database ? with_isolated_connection(database) do
-              execute_query(tree, ctx, object)
-            end : execute_query(tree, ctx, object)
+              execute_query(tree, ctx, object, irep_node)
+            end : execute_query(tree, ctx, object, irep_node)
 
             ResponseBuilder.new tree, response
           rescue Activecube::InputArgumentError => ex
@@ -77,22 +77,29 @@ module Activecube
         handler.clear_all_connections! if handler
       end
 
-      def execute_query tree, ctx, object
+      def execute_query tree, ctx, object, irep_node
         cube_query = tree.build_query
         cube_query = object.append_cube_query(cube_query) if object.respond_to?(:append_cube_query)
-        cube_query.stats = field_stats(ctx)
+        cube_query.stats = field_stats(ctx, irep_node)
         cube_query.headers = ctx[:headers]
         cube_query.query
       end
 
       # Своя сессия ClickHouse на каждое поле (см. FieldStats). Суффикс —
-      # путь поля в ответе: уникален в пределах запроса и виден в query_log.
-      def field_stats ctx
+      # путь поля в ответе (ctx здесь — контекст запроса, его path пуст,
+      # поэтому путь собирается по irep_node) плюс случайный хвост на случай
+      # одинаковых путей внутри списков.
+      def field_stats ctx, irep_node
         stats = ctx[:stats]
         return stats unless stats.respond_to?(:session_id)
 
-        suffix = ctx.respond_to?(:path) && ctx.path ? ctx.path.join('.') : SecureRandom.hex(4)
-        FieldStats.new(stats, suffix)
+        path = []
+        node = irep_node
+        while node.respond_to?(:name) && node.name
+          path.unshift node.name
+          node = node.respond_to?(:parent) ? node.parent : nil
+        end
+        FieldStats.new(stats, "#{path.join('.')}:#{SecureRandom.hex(3)}")
       end
 
       def append_extra extra
