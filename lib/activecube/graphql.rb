@@ -1,2 +1,6 @@
 require "activecube/graphql/version"
+require "activecube/graphql/lazy_query"
+require "activecube/graphql/field_stats"
+require "activecube/graphql/thread_local_database"
+require "activecube/graphql/thread_local_connection"
 require "activecube/graphql/cube_field"

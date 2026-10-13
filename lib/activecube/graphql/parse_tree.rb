@@ -2,6 +2,9 @@ module Activecube
   module Graphql
     class ParseTree
 
+      # Статистика запроса для этого поля (см. CubeField#field_stats).
+      attr_accessor :stats
+
       class Element
 
         TYPENAME = '__typename'

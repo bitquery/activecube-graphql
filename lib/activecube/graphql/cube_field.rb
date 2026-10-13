@@ -1,5 +1,11 @@
+require "activecube/query_methods"
 require "activecube/graphql/parse_tree"
 require "activecube/graphql/response_builder"
+require "activecube/graphql/lazy_query"
+require "activecube/graphql/field_stats"
+require "activecube/graphql/thread_local_database"
+require "activecube/graphql/thread_local_connection"
+require "securerandom"
 
 require "graphql/schema/member"
 require "graphql/schema/field_extension"
@@ -17,6 +23,8 @@ module Activecube
       # Override #initialize to take a new argument cube:
       def initialize(*args, cube: nil, **kwargs, &block)
         @cube = cube
+        ThreadLocalDatabase.install(cube) if cube
+        ThreadLocalConnection.install
         # Pass on the default args:
         super(*args, **kwargs, &block)
         append_extra :irep_node
@@ -28,29 +36,88 @@ module Activecube
 
         irep_node = ruby_kwargs[:irep_node]
         tree = ParseTree.new cube, irep_node
+        # Сигнатура execute_query(tree, ctx, object) — публичный контракт:
+        # приложение её переопределяет (prepend) и зовёт super, поэтому
+        # статистика поля передаётся через tree, а не аргументом.
+        tree.stats = field_stats ctx, irep_node
 
         object = obj.object
         database = (object.kind_of?(Hash) && object[:database]) ||
           (object.respond_to?(:database) && object.database)
 
-        response = database ? cube.connected_to(database: database) do
-          execute_query(tree, ctx, object)
-        end : execute_query(tree, ctx, object)
+        cube_name = cube.name
 
-        ResponseBuilder.new tree, response
+        # Возвращаем отложенное значение: запрос к базе стартует сразу, а
+        # graphql-ruby форсирует результат только после резолва всех соседних
+        # полей. Благодаря этому алиасы одного корневого поля идут в базу
+        # одновременно. Требует lazy_resolve(LazyQuery, :value) на схеме.
+        # Отложенное значение: запрос стартует в потоке при резолве поля, а
+        # graphql-ruby форсирует результат после обхода соседних полей, так
+        # что алиасы одного уровня идут в базу одновременно. Требует
+        # lazy_resolve(LazyQuery, :value) на схеме.
+        #
+        # В потоке connected_to уходит в thread-local пул (ThreadLocalConnection);
+        # при форсировании в основном потоке он вызывается ещё раз без запроса,
+        # чтобы процесс был «подключён» к базе поля для вложенных резолверов —
+        # так же, как при прежнем последовательном резолве.
+        reconnect = database ? -> { cube.connected_to(database: database) {} } : nil
 
-      rescue Activecube::InputArgumentError => ex
-         raise GraphQL::ExecutionError, "Error executing #{cube.name}: #{ex.message}"
+        LazyQuery.new(on_force: reconnect, parallel: parallel_safe?) do
+          begin
+            ThreadLocalDatabase.with(database) do
+              response = database ? cube.connected_to(database: database) do
+                execute_query(tree, ctx, object)
+              end : execute_query(tree, ctx, object)
+
+              ResponseBuilder.new tree, response
+            end
+          rescue Activecube::InputArgumentError => ex
+            raise GraphQL::ExecutionError, "Error executing #{cube_name}: #{ex.message}"
+          end
+        end
       end
 
       private
 
+      # Кубы, переопределяющие connected_to (в приложении — Common::
+      # ConnectToFlowDatabase: coinpath и address_stat на flow-базе), держат
+      # состояние на классе: их view делает self.class.connect_to connection,
+      # а временные таблицы живут в сессии ClickHouse. Два таких поля в
+      # параллельных потоках перезаписывают друг другу соединение, и финальный
+      # запрос уходит в чужую сессию ("Table coinpath.txs_... doesn't exist").
+      # Такие кубы резолвятся как прежде — синхронно при форсировании.
+      # Обычные кубы на таблицах и чистых SQL-view (в т.ч. solana transfers с
+      # View::TransfersAnyFromTo) идут параллельно.
+      def parallel_safe?
+        return @parallel_safe if defined?(@parallel_safe)
+
+        owner = cube.respond_to?(:connected_to) ? cube.method(:connected_to).owner : nil
+        @parallel_safe = owner.nil? || owner == Activecube::QueryMethods
+      end
+
       def execute_query tree, ctx, object
         cube_query = tree.build_query
         cube_query = object.append_cube_query(cube_query) if object.respond_to?(:append_cube_query)
-        cube_query.stats = ctx[:stats]
+        cube_query.stats = tree.stats || ctx[:stats]
         cube_query.headers = ctx[:headers]
         cube_query.query
+      end
+
+      # Своя сессия ClickHouse на каждое поле (см. FieldStats). Суффикс —
+      # путь поля в ответе (ctx здесь — контекст запроса, его path пуст,
+      # поэтому путь собирается по irep_node) плюс случайный хвост на случай
+      # одинаковых путей внутри списков.
+      def field_stats ctx, irep_node
+        stats = ctx[:stats]
+        return stats unless stats.respond_to?(:session_id)
+
+        path = []
+        node = irep_node
+        while node.respond_to?(:name) && node.name
+          path.unshift node.name
+          node = node.respond_to?(:parent) ? node.parent : nil
+        end
+        FieldStats.new(stats, "#{path.join('.')}:#{SecureRandom.hex(3)}")
       end
 
       def append_extra extra
